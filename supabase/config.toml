@@ -1,0 +1,6 @@
+# Minimal Supabase CLI config. Used for `npx supabase link` + `npx supabase db push`
+# against the hosted project; local `supabase start` would need the full generated config.
+project_id = "job-hunter"
+
+[db]
+major_version = 17
