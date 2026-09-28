@@ -46,9 +46,11 @@ supabase/migrations/   SQL schema (RLS on every table, no policies)
    ```bash
    py -3.13 -m venv .venv
    .venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
-   pip install -e ".[dev]"         # add ,pdf for WeasyPrint PDFs (needs GTK/Pango, easiest on Linux/Docker)
-   copy .env.example .env          # then fill it in
+   pip install -r requirements-dev.txt   # pinned versions (runtime only: requirements.txt)
+   pip install -e .                      # makes `python -m jobhunter` / `jobhunter` available
+   copy .env.example .env                # then fill it in
    ```
+   `pyproject.toml` is the source of truth for dependencies. You can skip the requirements files and use `pip install -e ".[dev]"` to get the latest compatible versions. Add `,pdf` to the extras to get WeasyPrint for PDFs; it needs GTK/Pango, so it's easiest on Linux or Docker.
 2. **Supabase.** Create a project, then apply the schema:
    ```bash
    npx supabase login

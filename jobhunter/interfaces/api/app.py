@@ -29,9 +29,21 @@ def create_app(container=None, start_background=True):
     async def lifespan(app: FastAPI):
         scheduler = None
         if start_background:
+            # Check the database before starting the pool, so a bad DATABASE_URL fails fast and clearly.
+            try:
+                with container.session() as ctx:
+                    ctx.repos.runs.mark_interrupted()
+            except Exception as e:  # noqa: BLE001
+                from psycopg.errors import UndefinedTable
+                if isinstance(e, UndefinedTable):
+                    msg = ("Connected, but the JobHunter tables don't exist yet: " + str(e).splitlines()[0] +
+                           "\n  Apply the schema: npx supabase link --project-ref <ref> && npx supabase db push")
+                else:
+                    msg = ("Can't reach the database: " + str(e).splitlines()[0] + "\n  Fix DATABASE_URL in .env: "
+                           "Supabase > Connect > Session pooler.")
+                log.error(msg)
+                raise RuntimeError(msg) from None
             container.open_pool()
-            with container.session() as ctx:
-                ctx.repos.runs.mark_interrupted()
             if config.scheduler_enabled:
                 from ..scheduler import AppScheduler
                 scheduler = container.scheduler = AppScheduler(container).start()

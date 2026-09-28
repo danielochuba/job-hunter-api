@@ -61,7 +61,7 @@ create table public.cvs (
   cv          jsonb not null,          -- master CV (Phase 1 YAML shape, minus contact block)
   raw_text    text,
   source_file text,                    -- storage path of the uploaded original
-  embedding   vector(1536),
+  embedding   extensions.vector(1536),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
@@ -115,7 +115,7 @@ create table public.jobs (
   remote_policy     text,                          -- remote | hybrid | onsite | unknown
   visa_sponsorship  text,                          -- yes | no | unknown
   salary            text,
-  embedding         vector(1536),
+  embedding         extensions.vector(1536),
   similarity        real,
   cv_id             bigint references public.cvs (id) on delete set null,
   fit_score         integer,
