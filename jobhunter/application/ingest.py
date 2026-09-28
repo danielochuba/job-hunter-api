@@ -82,6 +82,8 @@ def parse(run: RunContext, filename, data):
         cv = structured.get("cv", structured)
         contact = structured.get("contact") or contact_from_phase1(cv)
         return {"contact": contact, "cv": normalise(cv), "raw_text": text}
-    res = run.llm.structured(run.llm.strong_model, INGEST_SYSTEM, f"CV ({filename}):\n\n{text[:40000]}",
-                             CV_SCHEMA, "master_cv", purpose="ingest")
+    # Transcription, not judgement: the fast model with low reasoning effort is accurate and far quicker.
+    run.log(f"Extracted {len(text):,} characters from {filename}; structuring with {run.llm.fast_model}…")
+    res = run.llm.structured(run.llm.fast_model, INGEST_SYSTEM, f"CV ({filename}):\n\n{text[:40000]}",
+                             CV_SCHEMA, "master_cv", purpose="ingest", effort="low")
     return {"contact": res["contact"], "cv": normalise(res["cv"]), "raw_text": text}

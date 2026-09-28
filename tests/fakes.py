@@ -199,7 +199,7 @@ class FakeLLM:
             self.on_usage(purpose, "text-embedding-3-small", 10 * len(texts), 0)
         return [[float(t.lower().count(w)) + 0.01 for w in vocab] for t in texts]
 
-    def structured(self, model, system, user, schema, name, purpose=None):
+    def structured(self, model, system, user, schema, name, purpose=None, effort=None):
         self.calls.append((name, user))
         if self.on_usage:
             self.on_usage(purpose or name, model, 1000, 200)

@@ -7,7 +7,9 @@ class OpenAILLM:
                  embed_model="text-embedding-3-small", on_usage=None):
         from openai import OpenAI
 
-        self.client = OpenAI(api_key=api_key) if api_key else OpenAI()
+        # Bounded timeout so a stuck call fails the run instead of hanging it forever.
+        opts = {"timeout": 240.0, "max_retries": 2}
+        self.client = OpenAI(api_key=api_key, **opts) if api_key else OpenAI(**opts)
         self.fast_model = fast_model
         self.strong_model = strong_model
         self.embed_model = embed_model
@@ -27,12 +29,15 @@ class OpenAILLM:
             out.extend(d.embedding for d in resp.data)
         return out
 
-    def structured(self, model, system, user, schema, name, purpose=None):
-        """Chat call that must return JSON matching `schema` (strict structured outputs)."""
+    def structured(self, model, system, user, schema, name, purpose=None, effort=None):
+        """Chat call that must return JSON matching `schema` (strict structured outputs).
+        effort: optional reasoning effort ("minimal" | "low" | "medium" | "high") for reasoning models."""
+        extra = {"reasoning_effort": effort} if effort and model.startswith(("gpt-5", "o")) else {}
         resp = self.client.chat.completions.create(
             model=model,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
             response_format={"type": "json_schema", "json_schema": {"name": name, "schema": schema, "strict": True}},
+            **extra,
         )
         self._record(purpose or name, model, resp.usage)
         msg = resp.choices[0].message
