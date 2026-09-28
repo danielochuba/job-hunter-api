@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 
 from ...domain.contacts import extract_emails
 from ...domain.jobs import company_domain_from_url
-from ..sources.http import BROWSER_UA, TIMEOUT, iso, text_of
+from ..sources.http import BROWSER_UA, SESSION, TIMEOUT, iso, text_of
 
 SITE_EMAIL_PATHS = ("", "/careers", "/jobs", "/contact", "/about", "/company")
 
@@ -90,7 +90,7 @@ class HttpWebPages:
 
     def _get(self, url, timeout=None):
         try:
-            return requests.get(url, headers=self.headers, timeout=timeout or self.timeout)
+            return SESSION.get(url, headers=self.headers, timeout=timeout or self.timeout)
         except requests.RequestException:
             return None
 

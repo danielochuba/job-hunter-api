@@ -11,9 +11,7 @@ import hashlib
 import re
 import time
 
-import requests
-
-from .http import HEADERS, POLITE_DELAY, TIMEOUT, iso, relative_iso, remote, salary
+from .http import HEADERS, POLITE_DELAY, SESSION, TIMEOUT, iso, relative_iso, remote, salary
 
 # --------------------------------------------------------------------------- helpers
 
@@ -50,7 +48,7 @@ class Adzuna(_Keyed):
     def __call__(self, queries, context=None):
         for country in self.countries:
             for q in (queries or ["software developer"])[: self.max_queries]:
-                r = requests.get(f"https://api.adzuna.com/v1/api/jobs/{country}/search/1", headers=HEADERS, timeout=TIMEOUT,
+                r = SESSION.get(f"https://api.adzuna.com/v1/api/jobs/{country}/search/1", headers=HEADERS, timeout=TIMEOUT,
                                  params={"app_id": self.app_id, "app_key": self.app_key, "what": q, "results_per_page": 50,
                                          "max_days_old": 21, "content-type": "application/json"})
                 r.raise_for_status()
@@ -99,7 +97,7 @@ class GoogleJobs(_Keyed):
 
     def __call__(self, queries, context=None):
         for params in self._searches(queries, context):
-            r = requests.get("https://serpapi.com/search.json", timeout=TIMEOUT,
+            r = SESSION.get("https://serpapi.com/search.json", timeout=TIMEOUT,
                              params={"engine": "google_jobs", "hl": "en", "api_key": self.api_key, **params})
             r.raise_for_status()
             data = r.json()
@@ -150,7 +148,7 @@ class Reddit(_Keyed):
         if not (self.client_id and self.client_secret):
             return None
         if not self._token:
-            r = requests.post("https://www.reddit.com/api/v1/access_token", auth=(self.client_id, self.client_secret),
+            r = SESSION.post("https://www.reddit.com/api/v1/access_token", auth=(self.client_id, self.client_secret),
                               data={"grant_type": "client_credentials"}, headers=self.headers, timeout=TIMEOUT)
             r.raise_for_status()
             self._token = r.json()["access_token"]
@@ -162,7 +160,7 @@ class Reddit(_Keyed):
             url, headers = f"https://oauth.reddit.com/r/{sub}/new", {**self.headers, "Authorization": f"bearer {token}"}
         else:
             url, headers = f"https://www.reddit.com/r/{sub}/new.json", self.headers
-        r = requests.get(url, params={"limit": self.per_sub, "raw_json": 1}, headers=headers, timeout=TIMEOUT)
+        r = SESSION.get(url, params={"limit": self.per_sub, "raw_json": 1}, headers=headers, timeout=TIMEOUT)
         r.raise_for_status()
         return [c["data"] for c in r.json().get("data", {}).get("children", [])]
 
@@ -222,7 +220,7 @@ class WebSearch(_Keyed):
     def __call__(self, queries, context=None):
         seen = set()
         for q in self.searches(queries, context):
-            r = requests.get("https://api.search.brave.com/res/v1/web/search", timeout=TIMEOUT,
+            r = SESSION.get("https://api.search.brave.com/res/v1/web/search", timeout=TIMEOUT,
                              headers={"Accept": "application/json", "X-Subscription-Token": self.api_key},
                              params={"q": q, "count": 20, "freshness": self.freshness})
             r.raise_for_status()

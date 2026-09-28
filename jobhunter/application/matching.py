@@ -113,20 +113,8 @@ def score(run: RunContext, limit, job_ids=None):
             cv_row = r.cvs.get(cv_id) if cv_id else None
             cv_text[cv_id] = as_text(with_contact(cv_row["cv"], user)) if cv_row else ""
         # CV goes first so the repeated prefix benefits from OpenAI's automatic prompt caching.
-        msg = (f"CANDIDATE CV:
-{cv_text[cv_id]}
-
----
-CANDIDATE CONSTRAINTS:
-{constraints}
-
-"
-               f"{feedback}
-
----
-JOB: {job['title']} at {job['company']} ({job['location']})
-
-"
+        msg = (f"CANDIDATE CV:\n{cv_text[cv_id]}\n\n---\nCANDIDATE CONSTRAINTS:\n{constraints}\n\n"
+               f"{feedback}\n\n---\nJOB: {job['title']} at {job['company']} ({job['location']})\n\n"
                f"{job['description'][:12000]}")
         pending.append((job, cv_id, stage_ok, msg))
 

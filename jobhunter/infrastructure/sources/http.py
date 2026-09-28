@@ -6,12 +6,29 @@ from email.utils import parsedate_to_datetime
 
 import requests
 from bs4 import BeautifulSoup
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 TIMEOUT = 20
 HEADERS = {"User-Agent": "jobhunter/0.2 (personal job search)"}
 BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
               "Chrome/126.0 Safari/537.36")
 POLITE_DELAY = 0.5  # seconds between requests to the same source
+
+
+def _session():
+    """Shared HTTP session that retries connection drops, DNS blips and 429/5xx with backoff."""
+    retry = Retry(total=4, connect=4, read=2, status=3, backoff_factor=1.5,
+                  status_forcelist=(429, 500, 502, 503, 504), allowed_methods=("GET", "POST"),
+                  respect_retry_after_header=True)
+    s = requests.Session()
+    adapter = HTTPAdapter(max_retries=retry, pool_maxsize=16)
+    s.mount("https://", adapter)
+    s.mount("http://", adapter)
+    return s
+
+
+SESSION = _session()
 
 
 def text_of(raw_html):
@@ -22,13 +39,13 @@ def text_of(raw_html):
 
 
 def get_json(url, params=None):
-    r = requests.get(url, headers=HEADERS, timeout=TIMEOUT, params=params)
+    r = SESSION.get(url, headers=HEADERS, timeout=TIMEOUT, params=params)
     r.raise_for_status()
     return r.json()
 
 
 def get_text(url):
-    r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+    r = SESSION.get(url, headers=HEADERS, timeout=TIMEOUT)
     r.raise_for_status()
     return r.text
 

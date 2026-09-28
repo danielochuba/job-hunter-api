@@ -7,7 +7,7 @@ import requests
 from ...domain.jobs import match_ats
 from .aggregators import AGGREGATORS
 from .ats import BOARDS
-from .http import BROWSER_UA, HEADERS, POLITE_DELAY, TIMEOUT
+from .http import BROWSER_UA, HEADERS, POLITE_DELAY, SESSION, TIMEOUT
 
 SOURCE_INFO = {
     "remotive": "Remote jobs, searchable",
@@ -109,7 +109,7 @@ class HttpJobSources:
         if found:
             return found
         try:
-            page = requests.get(url, headers={**HEADERS, "User-Agent": BROWSER_UA}, timeout=TIMEOUT).text
+            page = SESSION.get(url, headers={**HEADERS, "User-Agent": BROWSER_UA}, timeout=TIMEOUT).text
         except requests.RequestException:
             return None
         return match_ats(page)
