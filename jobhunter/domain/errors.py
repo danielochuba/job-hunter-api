@@ -35,3 +35,7 @@ class Unauthorized(JobHunterError):
 
 class Forbidden(JobHunterError):
     pass
+
+
+class ExternalServiceError(JobHunterError):
+    """A third-party service (Storage, Gmail, OpenAI...) failed."""

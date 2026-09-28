@@ -77,3 +77,20 @@ def test_invalid_stage_is_422(client):
                                     "description": ""}, "fp")
     r = client.patch(f"/jobs/{jid}", json={"stage": "bogus"}, headers=auth(token()))
     assert r.status_code == 422
+
+
+def test_database_outage_is_503_with_cors(client):
+    from psycopg import OperationalError
+
+    def boom(*a, **k):
+        raise OperationalError("failed to resolve host 'x': getaddrinfo failed")
+    client.container.ctx.repos.jobs.get = boom
+    r = client.get("/jobs/1", headers={**auth(token()), "Origin": "http://localhost:3000"})
+    assert r.status_code == 503
+    assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+def test_startup_error_classification():
+    from jobhunter.interfaces.api.app import _startup_error
+    assert _startup_error(Exception("failed to resolve host 'h': [Errno 11002] getaddrinfo failed"))[0] is True
+    assert _startup_error(Exception("FATAL: tenant/user postgres.x not found"))[0] is False

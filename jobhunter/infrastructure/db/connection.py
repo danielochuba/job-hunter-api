@@ -14,5 +14,8 @@ def connect(url):
 
 
 def pool(url, min_size=1, max_size=6):
+    # check= validates each connection before handing it out, so connections broken by a network
+    # blip are replaced instead of failing the request.
     return ConnectionPool(url, kwargs=CONNECT_KWARGS, min_size=min_size, max_size=max_size, open=True,
-                          name="jobhunter")
+                          name="jobhunter", check=ConnectionPool.check_connection, timeout=15,
+                          reconnect_timeout=60)

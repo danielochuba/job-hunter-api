@@ -92,3 +92,11 @@ def test_jsonld_job_posting():
     assert job["location"] == "Berlin, DE (Remote)" and job["remote_policy"] == "remote"
     assert job["salary"] == "EUR 70000–90000 year"
     assert job["description"] == "Build things with Python"
+
+
+def test_storage_keys_are_ascii_safe():
+    from jobhunter.infrastructure.storage.supabase_storage import safe_key
+    assert safe_key("_cvs/uploads/abc-Daniel Ochuba — Master Career Profile.docx") == \
+        "_cvs/uploads/abc-Daniel-Ochuba-Master-Career-Profile.docx"
+    assert safe_key("12/v1/cv.pdf") == "12/v1/cv.pdf"
+    assert safe_key("_avatars/Ünïcødé ✓.png") == "_avatars/Unicde.png"  # ø has no ASCII decomposition
