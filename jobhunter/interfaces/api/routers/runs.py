@@ -1,7 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 
 from ....application import runs
-from ....application.tasks import TASKS
+from ....application.tasks import TASKS, collect_then_match
 from ....domain.errors import InvalidInput
 from ..auth import current_user
 from ..deps import get_ctx, launch
@@ -16,7 +16,8 @@ def _start(request, ctx, background, kind, params=None):
 
 @router.post("/collect")
 def collect(request: Request, background: BackgroundTasks, ctx=Depends(get_ctx)):
-    return _start(request, ctx, background, "collect")
+    # The button collects and then matches (per Settings > Daily routine > "Also match & score").
+    return launch(request, ctx, background, "collect", collect_then_match)
 
 
 @router.post("/match")

@@ -10,11 +10,24 @@ from .prep import prep
 from .runs import RunContext
 
 
+def _auto_match(run: RunContext):
+    return (run.repos.settings.get()["schedule"] or {}).get("auto_match", True) and run.repos.cvs.any()
+
+
+def collect_then_match(run: RunContext, params):
+    """What the Collect button does: collect, then (if 'Also match & score' is on) rank the new jobs."""
+    result = {"collect": collect(run, params)}
+    if _auto_match(run) and result["collect"]["new"]:
+        run.log("Matching the new jobs against your CV…")
+        result["match"] = match(run, {})
+    return result
+
+
 def daily(run: RunContext, params):
     """Scheduled: collect -> match, due reminders, Gmail reply sync."""
     from .mail import sync_replies
     result = {"collect": collect(run, {})}
-    if (run.repos.settings.get()["schedule"] or {}).get("auto_match", True) and run.repos.cvs.any():
+    if _auto_match(run):
         result["match"] = match(run, {})
     result["reminders"] = due_reminders(run.app)
     try:
