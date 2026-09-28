@@ -10,10 +10,10 @@ alter table public.lead_cache enable row level security;
 
 -- Enable the new sources (keyed ones are skipped automatically until their API key is set).
 alter table public.settings alter column aggregators set default
-  '{remotive,remoteok,arbeitnow,himalayas,jobicy,weworkremotely,hn_whoishiring,themuse,workingnomads,adzuna,google_jobs,reddit,web_search}';
+  '{remotive,remoteok,arbeitnow,himalayas,jobicy,weworkremotely,hn_whoishiring,workingnomads,adzuna,google_jobs,reddit,web_search}';
 
 update public.settings
 set aggregators = aggregators || array(
-  select s from unnest('{themuse,workingnomads,adzuna,google_jobs,reddit,web_search}'::text[]) s
+  select s from unnest('{workingnomads,adzuna,google_jobs,reddit,web_search}'::text[]) s
   where s <> all (aggregators))
 where id = 1;

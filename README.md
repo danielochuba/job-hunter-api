@@ -74,6 +74,30 @@ supabase/migrations/   SQL schema (RLS on every table, no policies)
 
 Emails are only ever sent when you click Send and confirm.
 
+### Job sources
+
+These are free and always on. You can switch each one off in Settings.
+- Remotive, RemoteOK, Arbeitnow, Himalayas, Jobicy, We Work Remotely, Working Nomads.
+- Hacker News "Who is hiring?".
+- Company boards you add: Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee.
+
+These need a free key in `.env` and are skipped until you add it:
+
+| Source | Key | Free tier | What it adds |
+|---|---|---|---|
+| Google Jobs | `SERPAPI_API_KEY` ([serpapi.com](https://serpapi.com)) | ~100 searches/mo (`SERPAPI_MAX_QUERIES` per run, default 3) | Listings Google aggregates from LinkedIn, Indeed, Glassdoor, company sites, searched remote and in your country |
+| Web & discussions | `BRAVE_API_KEY` ([brave.com/search/api](https://brave.com/search/api)) | ~2,000/mo (`BRAVE_MAX_QUERIES`, default 8) | Hiring posts on blogs, forums, Reddit/HN/X/LinkedIn posts |
+| Reddit | `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` ([reddit.com/prefs/apps](https://www.reddit.com/prefs/apps), "script" app) | free | r/forhire, r/remotejs, r/PythonJobs, r/hiring… |
+| Adzuna | `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` ([developer.adzuna.com](https://developer.adzuna.com)) | free | Large job API; `ADZUNA_COUNTRIES` (default `gb,za`) |
+
+Discussion posts and web results are **leads**, not jobs, until they're checked:
+- Each page is fetched first.
+- If the page has `JobPosting` metadata, that's used directly.
+- Otherwise the fast model extracts the real job offers, or discards the page.
+- At most 40 leads are examined per run, and each is examined only once.
+
+For candidates outside the US and EU, remote jobs restricted to regions you can't work in ("US only", "must reside in the EU") are marked ineligible before scoring. Set your country and work authorisations in your Profile.
+
 ### Hunter.io (optional)
 Set `HUNTER_API_KEY` to add Hunter's domain search to contact discovery.
 

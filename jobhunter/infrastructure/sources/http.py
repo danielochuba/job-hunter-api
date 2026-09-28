@@ -38,8 +38,10 @@ def text_of(raw_html):
     return soup.get_text("\n", strip=True)
 
 
-def get_json(url, params=None):
-    r = SESSION.get(url, headers=HEADERS, timeout=TIMEOUT, params=params)
+def get_json(url, params=None, browser=False):
+    """browser=True sends a browser User-Agent, for sites that reject bot-looking clients."""
+    headers = {**HEADERS, "User-Agent": BROWSER_UA} if browser else HEADERS
+    r = SESSION.get(url, headers=headers, timeout=TIMEOUT, params=params)
     r.raise_for_status()
     return r.json()
 

@@ -131,10 +131,10 @@ DEFAULT_SUBREDDITS = ("forhire", "hiring", "remotejs", "PythonJobs", "jobbit", "
 
 
 class Reddit(_Keyed):
-    """Hiring posts from job subreddits. Uses OAuth (REDDIT_CLIENT_ID/SECRET) when set, else Reddit's public
-    JSON (works, but rate-limited). Posts are leads: the LLM decides if a post is a real job offer."""
+    """Hiring posts from job subreddits via Reddit's OAuth API (Reddit blocks anonymous access).
+    Posts are leads: the LLM decides if a post is a real job offer."""
     name = "reddit"
-    needs = "REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET (optional)"
+    needs = "REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET"
 
     def __init__(self, client_id="", client_secret="", subreddits=DEFAULT_SUBREDDITS, per_sub=50, max_age_days=21):
         self.client_id, self.client_secret = client_id, client_secret
@@ -143,6 +143,10 @@ class Reddit(_Keyed):
         self.max_age = max_age_days * 86400
         self._token = None
         self.headers = {"User-Agent": "jobhunter/0.2 (personal job search; by u/jobhunter)"}
+
+    @property
+    def configured(self):
+        return bool(self.client_id and self.client_secret)
 
     def _auth(self):
         if not (self.client_id and self.client_secret):

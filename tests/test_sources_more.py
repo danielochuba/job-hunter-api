@@ -37,11 +37,15 @@ def test_reddit_keeps_hiring_posts_only():
     def post(i, title):
         return {"data": {"id": i, "title": title, "selftext": "Node + React, remote", "permalink": f"/r/x/{i}",
                          "created_utc": now - 3600}}
-    responses.get("https://www.reddit.com/r/forhire/new.json", json={"data": {"children": [
+    responses.post("https://www.reddit.com/api/v1/access_token", json={"access_token": "t"})
+    responses.get("https://oauth.reddit.com/r/forhire/new", json={"data": {"children": [
         post("a", "[Hiring] Full-stack developer, $60/hr"), post("b", "[For Hire] Full-stack dev available"),
         post("c", "Resume review please")]}})
-    leads = list(keyed.Reddit(subreddits=("forhire",))([]))
+    src = keyed.Reddit("id", "secret", subreddits=("forhire",))
+    leads = list(src([]))
     assert [l["key"] for l in leads] == ["reddit:a"] and leads[0]["lead"]
+    assert responses.calls[1].request.headers["Authorization"] == "bearer t"
+    assert keyed.Reddit().configured is False  # Reddit blocks anonymous access
 
 
 @responses.activate

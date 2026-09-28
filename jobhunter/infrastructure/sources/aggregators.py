@@ -192,34 +192,9 @@ def hn_whoishiring(queries, max_comments=400):
         }
 
 
-def themuse(queries, max_pages=3):
-    """The Muse public API: remote software roles (no key needed)."""
-    for page in range(max_pages):
-        data = get_json("https://www.themuse.com/api/public/jobs",
-                        params={"page": page, "category": "Software Engineering", "location": "Flexible / Remote"})
-        for j in data.get("results", []):
-            if not query_match(j.get("name", ""), queries):
-                continue
-            locs = ", ".join(l.get("name", "") for l in j.get("locations") or [])
-            yield {
-                "key": f"themuse:{j['id']}",
-                "source": "themuse",
-                "company": (j.get("company") or {}).get("name", ""),
-                "title": j.get("name", ""),
-                "location": locs or "Remote",
-                "url": (j.get("refs") or {}).get("landing_page", ""),
-                "description": text_of(j.get("contents")),
-                "posted_at": j.get("publication_date"),
-                "remote_policy": remote("flexible" in locs.lower() or "remote" in locs.lower(), locs),
-            }
-        if page + 1 >= data.get("page_count", 0):
-            break
-        time.sleep(POLITE_DELAY)
-
-
 def workingnomads(queries):
     """Working Nomads: curated remote jobs, many open worldwide (no key needed)."""
-    for j in get_json("https://www.workingnomads.com/api/exposed_jobs/"):
+    for j in get_json("https://www.workingnomads.com/api/exposed_jobs/", browser=True):
         blob = " ".join([j.get("title", ""), j.get("tags", "") or "", j.get("category_name", "") or ""])
         if not query_match(blob, queries):
             continue
@@ -238,4 +213,4 @@ def workingnomads(queries):
 
 AGGREGATORS = {"remotive": remotive, "remoteok": remoteok, "arbeitnow": arbeitnow,
                "himalayas": himalayas, "jobicy": jobicy, "weworkremotely": weworkremotely,
-               "hn_whoishiring": hn_whoishiring, "themuse": themuse, "workingnomads": workingnomads}
+               "hn_whoishiring": hn_whoishiring, "workingnomads": workingnomads}

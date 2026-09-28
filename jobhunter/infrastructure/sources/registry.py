@@ -17,7 +17,6 @@ SOURCE_INFO = {
     "jobicy": "Remote jobs by tag",
     "weworkremotely": "Remote dev & ops feeds",
     "hn_whoishiring": "Monthly Hacker News hiring thread",
-    "themuse": "Remote software roles",
     "workingnomads": "Curated remote jobs, many worldwide",
     "adzuna": "Big job search API (UK, South Africa, ...)",
     "google_jobs": "Google Jobs: LinkedIn, Indeed, Glassdoor & more",
