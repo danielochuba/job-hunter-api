@@ -24,6 +24,15 @@ class Config:
     openai_embed_model: str = "text-embedding-3-small"
     prices: dict = field(default_factory=lambda: dict(DEFAULT_PRICES))
     hunter_api_key: str = ""
+    serpapi_api_key: str = ""
+    serpapi_max_queries: int = 3
+    brave_api_key: str = ""
+    brave_max_queries: int = 8
+    adzuna_app_id: str = ""
+    adzuna_app_key: str = ""
+    adzuna_countries: tuple = ("gb", "za")
+    reddit_client_id: str = ""
+    reddit_client_secret: str = ""
     google_client_id: str = ""
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8000/gmail/callback"
@@ -58,6 +67,15 @@ class Config:
             openai_embed_model=env("OPENAI_EMBED_MODEL", "text-embedding-3-small"),
             prices=prices,
             hunter_api_key=env("HUNTER_API_KEY", ""),
+            serpapi_api_key=env("SERPAPI_API_KEY", ""),
+            serpapi_max_queries=int(env("SERPAPI_MAX_QUERIES", "3") or 3),
+            brave_api_key=env("BRAVE_API_KEY", ""),
+            brave_max_queries=int(env("BRAVE_MAX_QUERIES", "8") or 8),
+            adzuna_app_id=env("ADZUNA_APP_ID", ""),
+            adzuna_app_key=env("ADZUNA_APP_KEY", ""),
+            adzuna_countries=tuple(c.strip() for c in (env("ADZUNA_COUNTRIES", "gb,za") or "gb,za").split(",") if c.strip()),
+            reddit_client_id=env("REDDIT_CLIENT_ID", ""),
+            reddit_client_secret=env("REDDIT_CLIENT_SECRET", ""),
             google_client_id=env("GOOGLE_CLIENT_ID", ""),
             google_client_secret=env("GOOGLE_CLIENT_SECRET", ""),
             google_redirect_uri=env("GOOGLE_REDIRECT_URI", "http://localhost:8000/gmail/callback"),

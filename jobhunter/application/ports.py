@@ -39,9 +39,13 @@ class JobSources(Protocol):
     aggregators: tuple[str, ...]
 
     def collect(self, companies: dict[str, list[str]], queries: list[str], aggregators: list[str],
-                keep: Callable[[Record], bool], on_source: Callable[[str], None] | None = None
-                ) -> Iterator[tuple[Record | None, str | None]]:
-        """Yields (job, None) for jobs where keep(job) is true, or (None, error) per failing source."""
+                keep: Callable[[Record], bool], on_source: Callable[[str], None] | None = None,
+                context: dict | None = None) -> Iterator[tuple[Record | None, str | None]]:
+        """Yields (job, None) for jobs where keep(job) is true, or (None, error) per failing source.
+        A yielded record with lead=True is not a job yet (a post/search result with `text` and `url`)."""
+
+    def status(self) -> dict[str, dict]:
+        """{source: {configured, needs, info, keyed}} for the settings UI."""
 
     def fetch_posting(self, url: str) -> Record | None:
         """A single posting via its ATS API, if `url` is an ATS job URL."""
@@ -228,6 +232,11 @@ class IntegrationRepo(Protocol):
     def update_token(self, provider: str, token: dict) -> None: ...
 
 
+class LeadRepo(Protocol):
+    def seen(self, keys: list[str]) -> set[str]: ...
+    def mark(self, key: str, jobs: int) -> None: ...
+
+
 class RunRepo(Protocol):
     def active_of_kind(self, kind: str) -> Record | None: ...
     def create(self, kind: str, params: dict, trigger: str) -> Record: ...
@@ -263,5 +272,6 @@ class Repositories(Protocol):
     integrations: IntegrationRepo
     runs: RunRepo
     usage: UsageRepo
+    leads: LeadRepo
 
     def transaction(self): ...

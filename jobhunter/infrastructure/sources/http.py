@@ -1,6 +1,7 @@
 """HTTP + normalisation helpers shared by the job-source adapters."""
 import html
-from datetime import datetime, timezone
+import re
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 
 import requests
@@ -61,3 +62,14 @@ def remote(flag, location=""):
     if flag or "remote" in (location or "").lower():
         return "remote"
     return None
+
+
+def relative_iso(text):
+    """'3 days ago' / '5 hours ago' / '30+ days ago' -> ISO timestamp (approximate), else None."""
+    m = re.search(r"(\d+)\+?\s*(minute|hour|day|week|month)", text or "", re.I)
+    if not m:
+        return None
+    n, unit = int(m.group(1)), m.group(2).lower()
+    delta = {"minute": timedelta(minutes=n), "hour": timedelta(hours=n), "day": timedelta(days=n),
+             "week": timedelta(weeks=n), "month": timedelta(days=30 * n)}[unit]
+    return (datetime.now(timezone.utc) - delta).isoformat()

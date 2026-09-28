@@ -9,6 +9,7 @@ from .infrastructure.documents.renderer import FileTextExtractor, JinjaRenderer
 from .infrastructure.hunter import DesktopNotifier, HunterFinder
 from .infrastructure.llm.openai_llm import OpenAILLM
 from .infrastructure.mail.gmail import GmailMailer
+from .infrastructure.sources.keyed import Adzuna, GoogleJobs, Reddit, WebSearch
 from .infrastructure.sources.registry import HttpJobSources
 from .infrastructure.storage.supabase_storage import SupabaseStorage
 from .infrastructure.web.pages import HttpWebPages
@@ -18,7 +19,12 @@ class Container:
     def __init__(self, config: Config):
         c = self.config = config
         self.storage = SupabaseStorage(c.supabase_url, c.supabase_service_role_key, c.storage_bucket)
-        self.sources = HttpJobSources()
+        self.sources = HttpJobSources(keyed=[
+            Adzuna(c.adzuna_app_id, c.adzuna_app_key, c.adzuna_countries),
+            GoogleJobs(c.serpapi_api_key, c.serpapi_max_queries),
+            Reddit(c.reddit_client_id, c.reddit_client_secret),
+            WebSearch(c.brave_api_key, c.brave_max_queries),
+        ])
         self.web = HttpWebPages()
         self.finder = HunterFinder(c.hunter_api_key)
         self.mailer = GmailMailer(c.google_client_id, c.google_client_secret, c.google_redirect_uri)

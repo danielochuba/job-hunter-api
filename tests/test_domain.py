@@ -148,3 +148,39 @@ def test_contact_ranking():
 def test_funnel_is_cumulative():
     f = stages.funnel({"scored": 10, "applied": 3, "offer": 1})
     assert [x["n"] for x in f] == [14, 4, 4, 4, 1, 1]
+
+
+# ---------------------------------------------------------------- query matching & regions
+
+@pytest.mark.parametrize("title,expected", [
+    ("Senior Full Stack Engineer", True), ("Fullstack Developer (React/Node)", True), ("NodeJS Developer", True),
+    ("Backend Dev - Python", True), ("Product Designer", False), ("Full-Stack Marketing Manager", False),
+])
+def test_query_match_folds_synonyms(title, expected):
+    assert jobs.query_match(title, ["Full-Stack Developer", "Node.js Developer", "Backend Engineer"]) is expected
+
+
+def test_search_terms_dedupe_and_strip():
+    got = jobs.search_terms(["Full-Stack Developer", "Full Stack Developer", "Full-Stack Engineer",
+                             "Full-Stack Engineer (AI automation)", "Node.js Developer", "Software Engineer"])
+    assert got == ["Full-Stack Developer", "Node.js Developer", "Software Engineer"]
+
+
+NIGERIA = {"country": "Nigeria", "work_authorizations": ["Nigeria"], "acceptable_regions": ["EMEA", "Worldwide"]}
+
+
+@pytest.mark.parametrize("location,description,locked", [
+    ("Remote (US only)", "", True),
+    ("Remote", "Candidates must be located in the United States.", True),
+    ("Remote", "EU residents only.", True),
+    ("Remote (Worldwide)", "We hire anywhere.", False),
+    ("Remote", "Our US team is growing and we hire globally.", False),
+])
+def test_region_lock_for_candidates_in_africa(location, description, locked):
+    reason = eligibility.precheck({"title": "Dev", "location": location, "description": description}, NIGERIA)
+    assert (reason is not None) is locked
+
+
+def test_region_lock_respects_authorisation():
+    user = {**NIGERIA, "work_authorizations": ["Nigeria", "United States"]}
+    assert eligibility.precheck({"title": "Dev", "location": "Remote (US only)", "description": ""}, user) is None

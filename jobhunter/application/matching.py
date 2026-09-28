@@ -1,5 +1,7 @@
 """Rank jobs: embedding filter against every CV (best CV wins, feedback-boosted), then LLM fit scoring
 with strict JSON structured outputs."""
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 from ..domain import eligibility, stages
 from ..domain.cv import as_text, with_contact
 from ..domain.errors import InvalidInput
@@ -85,8 +87,11 @@ def embed_filter(run: RunContext, threshold, job_ids=None, boost_weight=0.5):
     return len(ids), kept
 
 
+SCORE_WORKERS = 5  # parallel LLM calls; DB writes stay on the run's thread
+
+
 def score(run: RunContext, limit, job_ids=None):
-    """LLM fit scoring. Returns [(row, result|None, error|None)]."""
+    """LLM fit scoring (in parallel). Returns [(row, result|None, error|None)]."""
     r = run.repos
     rows = r.jobs.to_score(limit, job_ids)
     user = r.users.get()
@@ -94,12 +99,11 @@ def score(run: RunContext, limit, job_ids=None):
     feedback = eligibility.feedback_text(r.jobs.feedback_examples())
     default_cv = r.cvs.default()
     cv_text = {}
-    results = []
-    for i, job in enumerate(rows):
-        run.progress(i, len(rows), f"Scoring {job['title']} at {job['company']}")
+    results, pending = [], []
+    for job in rows:
         stage_ok = job["stage"] in stages.RESCORABLE
         reason = eligibility.precheck(job, user)
-        if reason:
+        if reason:  # obvious no-go: no LLM call needed
             res = eligibility.ineligible_fit(reason, job)
             r.jobs.update(job["id"], fit_score=0, fit=res, **({"stage": "ineligible"} if stage_ok else {}))
             results.append((job, res, None))
@@ -109,21 +113,45 @@ def score(run: RunContext, limit, job_ids=None):
             cv_row = r.cvs.get(cv_id) if cv_id else None
             cv_text[cv_id] = as_text(with_contact(cv_row["cv"], user)) if cv_row else ""
         # CV goes first so the repeated prefix benefits from OpenAI's automatic prompt caching.
-        msg = (f"CANDIDATE CV:\n{cv_text[cv_id]}\n\n---\nCANDIDATE CONSTRAINTS:\n{constraints}\n\n"
-               f"{feedback}\n\n---\nJOB: {job['title']} at {job['company']} ({job['location']})\n\n"
+        msg = (f"CANDIDATE CV:
+{cv_text[cv_id]}
+
+---
+CANDIDATE CONSTRAINTS:
+{constraints}
+
+"
+               f"{feedback}
+
+---
+JOB: {job['title']} at {job['company']} ({job['location']})
+
+"
                f"{job['description'][:12000]}")
-        try:
-            res = run.llm.structured(run.llm.fast_model, SCORE_SYSTEM, msg, SCORE_SCHEMA, "job_fit", purpose="score")
-        except Exception as e:  # noqa: BLE001
-            results.append((job, None, str(e)))
-            continue
-        fields = {"fit_score": res["fit_score"], "fit": res, "cv_id": cv_id, "visa_sponsorship": res["visa_sponsorship"],
-                  "remote_policy": job.get("remote_policy") or res["remote_policy"],
-                  "salary": job.get("salary") or res["salary"] or None}
-        if stage_ok:
-            fields["stage"] = "scored" if res["eligible"] else "ineligible"
-        r.jobs.update(job["id"], **fields)
-        results.append((job, res, None))
+        pending.append((job, cv_id, stage_ok, msg))
+
+    if pending:
+        llm = run.llm  # create once before threads share it
+        run.progress(0, len(pending), f"Scoring {len(pending)} jobs")
+        with ThreadPoolExecutor(SCORE_WORKERS) as pool:
+            futures = {pool.submit(llm.structured, llm.fast_model, SCORE_SYSTEM, msg, SCORE_SCHEMA, "job_fit",
+                                   purpose="score"): (job, cv_id, stage_ok) for job, cv_id, stage_ok, msg in pending}
+            for n, fut in enumerate(as_completed(futures), 1):
+                job, cv_id, stage_ok = futures[fut]
+                run.progress(n, len(pending), f"Scored {job['title']} at {job['company']}")
+                try:
+                    res = fut.result()
+                except Exception as e:  # noqa: BLE001
+                    results.append((job, None, str(e)))
+                    continue
+                fields = {"fit_score": res["fit_score"], "fit": res, "cv_id": cv_id,
+                          "visa_sponsorship": res["visa_sponsorship"],
+                          "remote_policy": job.get("remote_policy") or res["remote_policy"],
+                          "salary": job.get("salary") or res["salary"] or None}
+                if stage_ok:
+                    fields["stage"] = "scored" if res["eligible"] else "ineligible"
+                r.jobs.update(job["id"], **fields)
+                results.append((job, res, None))
     run.progress(len(rows), len(rows))
     return results
 

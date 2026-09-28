@@ -44,11 +44,53 @@ def passes_filters(job, filters):
     return True
 
 
+_SYNONYMS = [
+    (r"\bfull[\s\-_/]*stack\b", "fullstack"), (r"\bback[\s\-_]*end\b", "backend"), (r"\bfront[\s\-_]*end\b", "frontend"),
+    (r"\bnode(?:\.?js)?\b", "node"), (r"\breact(?:\.?js)?\b", "react"), (r"\bnext(?:\.?js)?\b", "nextjs"),
+    (r"\b(?:engineer|developer|programmer|dev|swe)s?\b", "dev"), (r"\bml\b", "machine learning"),
+    (r"\bdevops\b", "devops"), (r"\bsre\b", "site reliability"),
+]
+_NOISE = {"senior", "junior", "mid", "lead", "principal", "staff", "intern", "internship", "the", "and", "or",
+          "a", "an", "of", "for", "with", "remote", "i", "ii", "iii", "sr", "jr"}
+
+
+def normalize_text(text):
+    t = f" {(text or '').lower()} "
+    for pattern, repl in _SYNONYMS:
+        t = re.sub(pattern, repl, t)
+    return re.sub(r"[^a-z0-9+#]+", " ", t).strip()
+
+
+def query_tokens(query):
+    """Significant tokens of a search query, e.g. 'Full-Stack Engineer (AI automation)' -> ['fullstack', 'dev']."""
+    q = re.sub(r"\(.*?\)", " ", query or "")
+    return [w for w in normalize_text(q).split() if w not in _NOISE]
+
+
 def query_match(text, queries):
+    """True if every significant token of any query appears in `text`. Synonyms are folded, so
+    'Full-Stack Developer' matches 'Full Stack Engineer' and 'Node.js dev' matches 'NodeJS Developer'."""
     if not queries:
         return True
-    t = text.lower()
-    return any(q.lower() in t for q in queries)
+    words = set(normalize_text(text).split())
+    for q in queries:
+        tokens = query_tokens(q)
+        if tokens and all(t in words for t in tokens):
+            return True
+    return False
+
+
+def search_terms(queries, limit=None):
+    """Clean, de-duplicated search phrases for external search APIs (parentheticals dropped;
+    'Full-Stack Engineer' and 'Full Stack Developer' collapse to one)."""
+    seen, out = set(), []
+    for q in queries or []:
+        clean = re.sub(r"\s+", " ", re.sub(r"\(.*?\)", " ", q)).strip(" -,")
+        key = " ".join(query_tokens(clean))
+        if clean and key and key not in seen:
+            seen.add(key)
+            out.append(clean)
+    return out[:limit] if limit else out
 
 
 def domain_of(url):

@@ -506,8 +506,10 @@ class PgRunRepo(_Repo):
     table = "runs"
 
     def active_of_kind(self, kind):
-        return self._one("SELECT id FROM runs WHERE kind = %s AND status IN ('queued', 'running') "
-                         "AND started_at > now() - interval '2 hours'", (kind,))
+        # A run still 'queued' after 5 minutes never started (its worker died): don't let it block new runs.
+        return self._one("SELECT id FROM runs WHERE kind = %s AND ((status = 'running' AND started_at > now() - "
+                         "interval '2 hours') OR (status = 'queued' AND started_at > now() - interval '5 minutes'))",
+                         (kind,))
 
     def create(self, kind, params, trigger):
         return self._insert(kind=kind, params=params or {}, trigger=trigger)
@@ -533,6 +535,19 @@ class PgRunRepo(_Repo):
     def mark_interrupted(self):
         self.conn.execute("UPDATE runs SET status = 'failed', error = 'Interrupted (API restarted)', "
                           "finished_at = now() WHERE status IN ('queued', 'running')")
+
+
+class PgLeadRepo(_Repo):
+    table = "lead_cache"
+
+    def seen(self, keys):
+        if not keys:
+            return set()
+        return {r["key"] for r in self._all("SELECT key FROM lead_cache WHERE key = ANY(%s)", (list(keys),))}
+
+    def mark(self, key, jobs):
+        self.conn.execute("INSERT INTO lead_cache (key, jobs) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE "
+                          "SET jobs = EXCLUDED.jobs, at = now()", (key, jobs))
 
 
 class PgUsageRepo(_Repo):
@@ -586,6 +601,7 @@ class PgRepositories:
         self.integrations = PgIntegrationRepo(conn)
         self.runs = PgRunRepo(conn)
         self.usage = PgUsageRepo(conn)
+        self.leads = PgLeadRepo(conn)
 
     def transaction(self):
         return self.conn.transaction()

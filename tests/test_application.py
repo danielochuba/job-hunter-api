@@ -148,3 +148,31 @@ def test_import_fingerprint_matches_existing(world):
     collect.insert_job(repos, job())
     existing = repos.jobs.find_by_key_or_fingerprint("import:x", fingerprint("acme", "Backend Engineer"))
     assert existing["key"] == "greenhouse:acme:1"
+
+
+def test_collect_turns_leads_into_jobs_and_caches_them(world):
+    ctx, repos, llm = world
+
+    class Sources:
+        aggregators = ("reddit",)
+
+        def collect(self, companies, queries, aggregators, keep, on_source=None, context=None):
+            lead = {"lead": True, "key": "reddit:1", "source": "reddit", "url": "https://reddit.com/1",
+                    "text": "[Hiring] Two roles: Backend Engineer and Designer", "fetch": False}
+            assert keep(lead)
+            yield lead, None
+    ctx.sources = Sources()
+    llm.responses["lead_jobs"] = {"jobs": [
+        {"title": "Backend Engineer", "company": "Acme", "location": "Remote", "remote_policy": "remote", "salary": "",
+         "description": "Python APIs", "apply_url": "", "company_website": "https://acme.io"},
+        {"title": "Designer", "company": "Acme", "location": "Remote", "remote_policy": "remote", "salary": "",
+         "description": "Figma", "apply_url": "", "company_website": ""}]}
+    repos.settings.update(aggregators=["reddit"], filters={"title_exclude": ["designer"]})
+    out = collect.collect(run_for(ctx, "collect"), {})
+    assert out["new"] == 1  # the designer role is filtered out after extraction
+    [j] = repos.jobs.all()
+    assert (j["title"], j["company_domain"], j["key"]) == ("Backend Engineer", "acme.io", "reddit:1#0")
+    assert repos.leads.marked == {"reddit:1": 2}
+    calls = len(llm.calls)
+    collect.collect(run_for(ctx, "collect"), {})  # same lead again: cached, no LLM call
+    assert len(llm.calls) == calls

@@ -11,6 +11,7 @@ MERGED_OBJECTS = ("filters", "matching", "schedule")
 def get(ctx: AppContext):
     s = dict(ctx.repos.settings.get())
     s["available_aggregators"] = list(ctx.sources.aggregators)
+    s["source_status"] = ctx.sources.status()
     s["available_sources"] = list(ctx.sources.company_sources)
     s["next_daily_run"] = ctx.scheduler.next_run() if ctx.scheduler else None
     return s

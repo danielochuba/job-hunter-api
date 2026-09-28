@@ -1,4 +1,5 @@
-"""JobSources port adapter: runs the ATS boards and aggregators, detects boards from careers URLs."""
+"""JobSources port adapter: runs the ATS boards, free aggregators and keyed sources; detects boards
+from careers URLs."""
 import time
 
 import requests
@@ -7,6 +8,22 @@ from ...domain.jobs import match_ats
 from .aggregators import AGGREGATORS
 from .ats import BOARDS
 from .http import BROWSER_UA, HEADERS, POLITE_DELAY, TIMEOUT
+
+SOURCE_INFO = {
+    "remotive": "Remote jobs, searchable",
+    "remoteok": "Remote tech jobs",
+    "arbeitnow": "Europe-focused, many visa-friendly",
+    "himalayas": "Remote jobs with region info",
+    "jobicy": "Remote jobs by tag",
+    "weworkremotely": "Remote dev & ops feeds",
+    "hn_whoishiring": "Monthly Hacker News hiring thread",
+    "themuse": "Remote software roles",
+    "workingnomads": "Curated remote jobs, many worldwide",
+    "adzuna": "Big job search API (UK, South Africa, ...)",
+    "google_jobs": "Google Jobs: LinkedIn, Indeed, Glassdoor & more",
+    "reddit": "Hiring posts in job subreddits",
+    "web_search": "Hiring posts across the web & discussions",
+}
 
 
 def _finish(job):
@@ -18,16 +35,31 @@ def _finish(job):
     return job
 
 
+def _call(fn, queries, context):
+    """Free aggregators are plain functions of (queries); keyed sources also get the user context."""
+    return fn(queries, context) if hasattr(fn, "configured") else fn(queries)
+
+
 class HttpJobSources:
     company_sources = tuple(BOARDS)
-    aggregators = tuple(AGGREGATORS)
 
-    def __init__(self, boards=None, aggregators=None, delay=POLITE_DELAY):
+    def __init__(self, keyed=(), boards=None, aggregators=None, delay=POLITE_DELAY):
         self.boards = boards or BOARDS
-        self.aggs = aggregators or AGGREGATORS
+        self.keyed = {k.name: k for k in keyed}
+        self.aggs = {**(aggregators or AGGREGATORS), **self.keyed}
+        self.aggregators = tuple(self.aggs)
         self.delay = delay
 
-    def collect(self, companies, queries, aggregators, keep, on_source=None):
+    def status(self):
+        """Per-source availability for the UI: {name: {configured, needs, info}}."""
+        out = {}
+        for name in self.aggregators:
+            k = self.keyed.get(name)
+            out[name] = {"configured": k.configured if k else True, "needs": getattr(k, "needs", ""),
+                         "info": SOURCE_INFO.get(name, ""), "keyed": bool(k)}
+        return out
+
+    def collect(self, companies, queries, aggregators, keep, on_source=None, context=None):
         for source, tokens in (companies or {}).items():
             fn = self.boards.get(source)
             if not fn:
@@ -46,12 +78,14 @@ class HttpJobSources:
         for name in aggregators or []:
             fn = self.aggs.get(name)
             if not fn:
-                yield None, f"unknown aggregator '{name}'"
+                yield None, f"unknown source '{name}'"
                 continue
+            if getattr(fn, "configured", True) is False:
+                continue  # keyed source without a key: silently skipped (Settings shows what's missing)
             if on_source:
                 on_source(name)
             try:
-                for job in fn(queries or []):
+                for job in _call(fn, queries or [], context or {}):
                     if keep(job):
                         yield _finish(job), None
             except Exception as e:  # noqa: BLE001

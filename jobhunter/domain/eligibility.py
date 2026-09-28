@@ -8,17 +8,59 @@ CITIZEN_ONLY = re.compile(r"(u\.?s\.?|us|american)\s+citizens?(hip)?\s+(only|req
                           r"must be a (u\.?s\.?|us) citizen|active (security|secret|ts/sci) clearance", re.I)
 US_NAMES = {"us", "usa", "united states", "united states of america"}
 
+# "Remote, but only if you live in X" -- the most common reason a remote job is closed to candidates in Africa.
+_REGION = (r"(?P<region>u\.?s\.?a?|united states|america|north america|canada|u\.?k\.?|united kingdom|"
+           r"e\.?u\.?|european union|europe|eea|australia|germany|india)")
+REGION_LOCK = re.compile(
+    r"(?:(?:must|need to|required to|should)\s+(?:be\s+)?(?:located|based|residing|reside|live|living)\s+in\s+(?:the\s+)?"
+    + _REGION + r"\b"
+    r"|\b" + _REGION.replace("?P<region>", "?P<region2>") + r"[\s-]*(?:based\s+)?(?:only|residents only|candidates only|applicants only)\b"
+    r"|remote\s*[(\-–,:]\s*" + _REGION.replace("?P<region>", "?P<region3>") + r"\s*(?:only)?\s*\))",
+    re.I)
+REGION_ALIASES = {
+    "us": US_NAMES | {"america", "north america"}, "canada": {"canada", "north america"},
+    "uk": {"uk", "united kingdom", "great britain", "england", "europe"},
+    "eu": {"eu", "european union", "europe", "eea"}, "australia": {"australia"},
+    "germany": {"germany", "eu", "european union"}, "india": {"india"},
+}
+
+
+def _canonical_region(raw):
+    r = re.sub(r"[^a-z ]", "", raw.lower()).strip()
+    for key, names in REGION_ALIASES.items():
+        if r in {re.sub(r"[^a-z ]", "", n) for n in names} or r == key:
+            return key
+    return r
+
+
+def region_lock(text, user):
+    """Return the region a remote job is restricted to, if the candidate can't work there; else None."""
+    m = REGION_LOCK.search(text or "")
+    if not m:
+        return None
+    region = _canonical_region(next(g for g in m.groups() if g))
+    # Residency locks are about where you may legally work, so only authorisations and your own
+    # country count (acceptable_regions is about timezones you'll work in, e.g. EMEA).
+    allowed = {a.lower().strip() for a in (user.get("work_authorizations") or [])}
+    allowed |= {(user.get("country") or "").lower().strip()}
+    names = REGION_ALIASES.get(region, {region})
+    return None if allowed & names else region
+
 
 def precheck(job, user):
     """Return a reason string if the job is obviously ineligible for the candidate, else None."""
     if not user:
         return None
-    text = f"{job.get('title', '')}\n{job.get('description', '')}"
+    text = f"{job.get('title', '')}\n{job.get('location', '')}\n{job.get('description', '')}"
     auths = {a.lower() for a in (user.get("work_authorizations") or [])}
     if CITIZEN_ONLY.search(text) and not (auths & US_NAMES):
         return "Requires US citizenship or security clearance"
     if user.get("needs_sponsorship") and NO_SPONSOR.search(text):
         return "Posting says it does not sponsor visas"
+    if user.get("country"):
+        region = region_lock(text, user)
+        if region:
+            return f"Only open to candidates based in {region.upper() if len(region) <= 3 else region.title()}"
     return None
 
 

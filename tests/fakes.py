@@ -165,6 +165,22 @@ class FakeUsage(Table):
         return sum(r["cost_usd"] for r in self.rows.values() if r["run_id"] == run_id)
 
 
+class FakeLeads:
+    def __init__(self):
+        self.marked = {}
+
+    def seen(self, keys):
+        return {k for k in keys if k in self.marked}
+
+    def mark(self, key, jobs):
+        self.marked[key] = jobs
+
+
+class FakeCompanies:
+    def by_source(self, active_only=True):
+        return {}
+
+
 class FakeRepos:
     def __init__(self):
         self.jobs = FakeJobs()
@@ -177,6 +193,8 @@ class FakeRepos:
         self.notifications = FakeNotifications()
         self.runs = FakeRuns()
         self.usage = FakeUsage()
+        self.leads = FakeLeads()
+        self.companies = FakeCompanies()
 
     @contextmanager
     def transaction(self):
