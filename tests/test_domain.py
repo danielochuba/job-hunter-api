@@ -184,3 +184,21 @@ def test_region_lock_for_candidates_in_africa(location, description, locked):
 def test_region_lock_respects_authorisation():
     user = {**NIGERIA, "work_authorizations": ["Nigeria", "United States"]}
     assert eligibility.precheck({"title": "Dev", "location": "Remote (US only)", "description": ""}, user) is None
+
+
+@pytest.mark.parametrize("mode,expected", [
+    ("full", "Lagos, Nigeria"), ("country", "Nigeria"), ("remote", "Remote · UTC+1 (WAT)"), ("hidden", ""),
+])
+def test_cv_location_modes(cv, user, mode, expected):
+    merged = cvmod.with_contact(cv, {**user, "cv_location": mode, "timezone": "Africa/Lagos"})
+    assert merged["location"] == expected
+
+
+def test_contact_line_has_no_stray_separator_when_location_hidden(cv, user):
+    from jobhunter.domain.truthfulness import build_cv_context
+    from jobhunter.infrastructure.documents.renderer import JinjaRenderer
+    merged = cvmod.with_contact(cv, {**user, "cv_location": "hidden"})
+    res = {"summary": "s", "skills_priority": [], "experience": [], "projects": []}
+    html = JinjaRenderer().cv_html(build_cv_context(res, merged))
+    line = html.split('<div class="contact">')[1].split("</div>")[0].strip()
+    assert line.startswith("me@example.com") and "Lagos" not in html

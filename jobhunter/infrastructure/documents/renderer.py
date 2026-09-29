@@ -16,12 +16,42 @@ class JinjaRenderer:
         return self.env.get_template("cv.html").render(**context)
 
     def pdf(self, html):
-        """Returns bytes, or None if WeasyPrint isn't usable here (HTML is still produced)."""
+        """PDF bytes, or None if no renderer is available (the HTML is still produced).
+        WeasyPrint first (Linux/Docker), then headless Chromium via Playwright (works on Windows)."""
         try:
             from weasyprint import HTML
             return HTML(string=html).write_pdf()
-        except Exception:  # noqa: BLE001
-            return None
+        except Exception:  # noqa: BLE001  not installed / missing GTK
+            pass
+        return _chromium_pdf(html)
+
+
+def _chromium_pdf(html):
+    """Print the HTML with headless Chromium: identical to the in-app preview. Uses Playwright's bundled
+    browser (`python -m playwright install chromium`), else an installed Chrome or Edge."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return None
+    try:
+        with sync_playwright() as p:
+            browser = None
+            for opts in ({}, {"channel": "chrome"}, {"channel": "msedge"}):
+                try:
+                    browser = p.chromium.launch(**opts)
+                    break
+                except Exception:  # noqa: BLE001
+                    continue
+            if browser is None:
+                return None
+            try:
+                page = browser.new_page()
+                page.set_content(html, wait_until="load")
+                return page.pdf(format="A4", print_background=True, prefer_css_page_size=True)
+            finally:
+                browser.close()
+    except Exception:  # noqa: BLE001
+        return None
 
 
 class FileTextExtractor:

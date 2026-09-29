@@ -27,10 +27,11 @@ dependencies = [
   "plyer>=2.1",
   "google-api-python-client>=2.130",
   "google-auth-oauthlib>=1.2",
+  "playwright>=1.47",
 ]
 
 [project.optional-dependencies]
-pdf = ["weasyprint>=62"]
+pdf = ["weasyprint>=62"]  # alternative renderer for Linux/Docker
 dev = ["pytest>=8", "responses>=0.25", "httpx>=0.27"]
 
 [project.scripts]

@@ -22,8 +22,12 @@
   <h1>{{ cv.name }}</h1>
   {% if cv.headline %}<div class="headline">{{ cv.headline }}</div>{% endif %}
   <div class="contact">
-    {{ cv.location }} · {{ cv.email }}{% if cv.phone %} · {{ cv.phone }}{% endif %}
-    {% for l in cv.links or [] %} · <a href="{{ l.url }}">{{ l.label }}</a>{% endfor %}
+    {%- set items = [] -%}
+    {%- if cv.location %}{% set _ = items.append(cv.location|e) %}{% endif -%}
+    {%- if cv.email %}{% set _ = items.append(cv.email|e) %}{% endif -%}
+    {%- if cv.phone %}{% set _ = items.append(cv.phone|e) %}{% endif -%}
+    {%- for l in cv.links or [] %}{% set _ = items.append('<a href="' ~ (l.url|e) ~ '">' ~ (l.label|e) ~ '</a>') %}{% endfor -%}
+    {{ items | join(" · ") | safe }}
   </div>
 
   <h2>Summary</h2>

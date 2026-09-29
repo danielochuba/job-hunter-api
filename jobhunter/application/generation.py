@@ -166,8 +166,20 @@ def html(ctx: AppContext, app_id):
     return {"html": render(ctx, app["result"], cv)}
 
 
+def ensure_pdf(ctx: AppContext, app):
+    """Render + store the PDF for a version that has none (e.g. made before a PDF renderer was available)."""
+    if app["cv_pdf_path"]:
+        return app
+    _, cv = cv_for(ctx, get_job(ctx, app["job_id"]), app["cv_id"])
+    pdf = ctx.renderer.pdf(render(ctx, app["result"], cv))
+    if not pdf:
+        return app
+    path = ctx.storage.upload(f"{app['job_id']}/v{app['version']}/cv.pdf", pdf, "application/pdf")
+    return ctx.repos.applications.update(app["id"], cv_pdf_path=path)
+
+
 def files(ctx: AppContext, app_id):
-    app = get_application(ctx, app_id)
+    app = ensure_pdf(ctx, get_application(ctx, app_id))
     job = get_job(ctx, app["job_id"])
     user = ctx.repos.users.get()
     base = f"{_slug((user or {}).get('full_name') or 'CV')}_{_slug(job['company'])}"

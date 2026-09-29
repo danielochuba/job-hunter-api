@@ -176,3 +176,22 @@ def test_collect_turns_leads_into_jobs_and_caches_them(world):
     calls = len(llm.calls)
     collect.collect(run_for(ctx, "collect"), {})  # same lead again: cached, no LLM call
     assert len(llm.calls) == calls
+
+
+def test_form_answer_is_grounded_and_saved(world):
+    from jobhunter.application import answers
+    ctx, repos, llm = world
+    jid = collect.insert_job(repos, job(description="No cover letter template. Tell us what you have built."))
+    llm.responses["form_answer"] = {"answer": "  I built DRF APIs serving 40k requests a day. ",
+                                    "bullet_ids_used": ["acme-2", "invented-9"]}
+    row = answers.generate(ctx, jid, "Message to the recruiter", max_words=120, tone="direct", emphasis="APIs")
+    assert row["answer"] == "I built DRF APIs serving 40k requests a day."
+    assert row["evidence"] == ["acme-2"]  # unknown bullet ids are dropped
+    name, prompt = llm.calls[-1]
+    assert name == "form_answer" and "No cover letter template" in prompt and "at most 120 words" in prompt
+    [listed] = answers.list_for_job(ctx, jid)
+    assert listed["evidence_text"][0]["text"].startswith("Designed REST APIs")
+    with pytest.raises(InvalidInput):
+        answers.generate(ctx, jid, "   ")
+    with pytest.raises(InvalidInput):
+        answers.generate(ctx, jid, "Why us?", tone="sarcastic")

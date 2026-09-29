@@ -16,7 +16,7 @@ JOB_SORTS = {"fit": "fit_score DESC NULLS LAST, similarity DESC NULLS LAST", "ne
              "posted": "posted_at DESC NULLS LAST", "similarity": "similarity DESC NULLS LAST",
              "updated": "updated_at DESC"}
 # jsonb columns that hold arrays (plain Python lists are otherwise sent as Postgres arrays)
-JSON_LIST_COLUMNS = {"other_links", "languages", "warnings"}
+JSON_LIST_COLUMNS = {"other_links", "languages", "warnings", "evidence"}
 
 
 def vec(v):
@@ -321,6 +321,9 @@ class PgCompanyRepo(_Repo):
 class PgApplicationRepo(_Repo):
     table = "applications"
 
+    def update(self, app_id, **fields):
+        return self._update(app_id, **fields)
+
     def get(self, app_id):
         return self._one("SELECT * FROM applications WHERE id = %s", (app_id,))
 
@@ -537,6 +540,25 @@ class PgRunRepo(_Repo):
                           "finished_at = now() WHERE status IN ('queued', 'running')")
 
 
+class PgAnswerRepo(_Repo):
+    table = "answers"
+
+    def create(self, **fields):
+        return self._insert(**fields)
+
+    def get(self, answer_id):
+        return self._one("SELECT * FROM answers WHERE id = %s", (answer_id,))
+
+    def for_job(self, job_id):
+        return self._all("SELECT * FROM answers WHERE job_id = %s ORDER BY created_at DESC", (job_id,))
+
+    def update(self, answer_id, **fields):
+        return self._update(answer_id, **fields)
+
+    def delete(self, answer_id):
+        self._delete(answer_id)
+
+
 class PgLeadRepo(_Repo):
     table = "lead_cache"
 
@@ -602,6 +624,7 @@ class PgRepositories:
         self.runs = PgRunRepo(conn)
         self.usage = PgUsageRepo(conn)
         self.leads = PgLeadRepo(conn)
+        self.answers = PgAnswerRepo(conn)
 
     def transaction(self):
         return self.conn.transaction()

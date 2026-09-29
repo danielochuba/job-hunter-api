@@ -1,7 +1,7 @@
 """Your user profile and master CVs."""
 import uuid
 
-from ..domain.cv import normalise, summary_stats
+from ..domain.cv import CV_LOCATION_MODES, normalise, summary_stats
 from ..domain.errors import InvalidInput, NotFound
 from .context import AppContext
 from .ingest import parse
@@ -13,6 +13,7 @@ PROFILE_FIELDS = {
     "portfolio_url", "other_links", "years_experience", "languages", "target_roles", "seniority",
     "employment_types", "needs_sponsorship", "work_authorizations", "acceptable_regions", "remote_only",
     "willing_to_relocate", "min_salary", "salary_currency", "notice_period", "email_signature", "onboarded",
+    "cv_location",
 }
 REQUIRED_FOR_GENERATION = ("first_name", "last_name", "email", "city", "country")
 COMPLETENESS = ("first_name", "last_name", "email", "phone", "city", "country", "headline", "linkedin_url",
@@ -45,6 +46,8 @@ def get_me(ctx: AppContext, user_id):
 
 def update_me(ctx: AppContext, user_id, fields):
     data = {k: v for k, v in fields.items() if k in PROFILE_FIELDS}
+    if "cv_location" in data and data["cv_location"] not in CV_LOCATION_MODES:
+        raise InvalidInput(f"cv_location must be one of {', '.join(CV_LOCATION_MODES)}")
     if "email" in data and not (data["email"] or "").strip():
         raise InvalidInput("Email can't be empty")
     return present(ctx, ctx.repos.users.update(user_id, **data))

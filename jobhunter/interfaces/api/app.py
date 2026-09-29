@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from ...domain import errors
 from .auth import TokenVerifier
-from .routers import (applications, contacts, gmail, health, insights, jobs, misc, profile, runs, settings,
+from .routers import (answers, applications, contacts, gmail, health, insights, jobs, misc, profile, runs, settings,
                       tracker)
 
 log = logging.getLogger("jobhunter.api")
@@ -102,6 +102,6 @@ def create_app(container=None, start_background=True):
     app.add_exception_handler(OperationalError, db_unavailable)
     app.add_exception_handler(PoolTimeout, db_unavailable)
 
-    for r in (health, profile, settings, jobs, runs, applications, contacts, gmail, tracker, insights, misc):
+    for r in (health, profile, settings, jobs, runs, applications, answers, contacts, gmail, tracker, insights, misc):
         app.include_router(r.router)
     return app

@@ -48,6 +48,7 @@ supabase/migrations/   SQL schema (RLS on every table, no policies)
    .venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
    pip install -r requirements-dev.txt   # pinned versions (runtime only: requirements.txt)
    pip install -e .                      # makes `python -m jobhunter` / `jobhunter` available
+   python -m playwright install chromium # headless browser that prints CV PDFs (once, ~115 MB)
    copy .env.example .env                # then fill it in
    ```
    `pyproject.toml` is the source of truth for dependencies. You can skip the requirements files and use `pip install -e ".[dev]"` to get the latest compatible versions. Add `,pdf` to the extras to get WeasyPrint for PDFs; it needs GTK/Pango, so it's easiest on Linux or Docker.

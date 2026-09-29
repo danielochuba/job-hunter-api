@@ -84,11 +84,45 @@ def contact_from_phase1(cv):
             "portfolio_url": links.get("portfolio", "") or links.get("website", "")}
 
 
+CV_LOCATION_MODES = ("full", "country", "remote", "hidden")
+
+
+def utc_offset_label(tz_name):
+    """'Africa/Lagos' -> 'UTC+1 (WAT)'. Returns the input unchanged if it isn't an IANA zone."""
+    if not tz_name:
+        return ""
+    try:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo(tz_name))
+    except Exception:  # noqa: BLE001  not an IANA name (e.g. "UTC+1"): show as typed
+        return tz_name
+    mins = int(now.utcoffset().total_seconds() // 60)
+    sign, mins = ("+" if mins >= 0 else "-"), abs(mins)
+    offset = f"UTC{sign}{mins // 60}" + (f":{mins % 60:02d}" if mins % 60 else "")
+    abbr = now.strftime("%Z")
+    return f"{offset} ({abbr})" if abbr and not abbr.startswith(("+", "-", "UTC", "GMT")) else offset
+
+
+def cv_location_text(user):
+    """How the location line on a CV reads, per the user's `cv_location` choice."""
+    mode = user.get("cv_location") or "full"
+    city, country = user.get("city"), user.get("country")
+    if mode == "hidden":
+        return ""
+    if mode == "country":
+        return country or ""
+    if mode == "remote":
+        tz = utc_offset_label(user.get("timezone"))
+        return f"Remote · {tz}" if tz else "Remote"
+    return ", ".join(x for x in (city, country) if x)
+
+
 def with_contact(cv, user):
     """Overlay contact details from the user profile onto a CV dict (for templates and prompts)."""
     if not user:
         return cv
-    location = ", ".join(x for x in (user.get("city"), user.get("country")) if x)
+    location = cv_location_text(user)
     links = [{"label": label, "url": user[k]} for label, k in
              (("LinkedIn", "linkedin_url"), ("GitHub", "github_url"), ("Portfolio", "portfolio_url"))
              if user.get(k)]
@@ -97,7 +131,8 @@ def with_contact(cv, user):
     return {**cv, "name": user.get("full_name") or cv.get("name", ""),
             "email": user.get("email") or cv.get("email", ""),
             "phone": phone or cv.get("phone", ""),
-            "location": location or cv.get("location", ""),
+            # an explicit choice (e.g. hidden) must not fall back to a location stored in the CV itself
+            "location": location if user.get("cv_location") not in (None, "full") else (location or cv.get("location", "")),
             "links": links or cv.get("links", []),
             "headline": user.get("headline")}
 

@@ -176,6 +176,17 @@ class FakeLeads:
         self.marked[key] = jobs
 
 
+class FakeAnswers(Table):
+    def create(self, **fields):
+        return self.add(**fields)
+
+    def for_job(self, job_id):
+        return [r for r in self.all() if r["job_id"] == job_id]
+
+    def delete(self, answer_id):
+        self.rows.pop(answer_id, None)
+
+
 class FakeCompanies:
     def by_source(self, active_only=True):
         return {}
@@ -195,6 +206,7 @@ class FakeRepos:
         self.usage = FakeUsage()
         self.leads = FakeLeads()
         self.companies = FakeCompanies()
+        self.answers = FakeAnswers()
 
     @contextmanager
     def transaction(self):

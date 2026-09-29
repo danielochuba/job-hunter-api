@@ -116,3 +116,16 @@ class ReminderPatch(BaseModel):
 
 class ReadIn(BaseModel):
     ids: list[int] | None = None
+
+
+class AnswerIn(BaseModel):
+    job_id: int
+    question: str
+    max_words: int = 150
+    tone: str = "direct"
+    emphasis: str | None = None
+
+
+class AnswerPatch(BaseModel):
+    answer: str | None = None
+    question: str | None = None
