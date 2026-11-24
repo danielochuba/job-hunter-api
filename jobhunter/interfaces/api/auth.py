@@ -1,7 +1,9 @@
 """Verify the Supabase access token sent by the web app as `Authorization: Bearer <jwt>`.
 
 New Supabase projects sign tokens with asymmetric keys (verified via the project's JWKS);
-legacy projects use the shared HS256 secret (SUPABASE_JWT_SECRET)."""
+legacy projects use the shared HS256 secret (SUPABASE_JWT_SECRET).
+
+In LOCAL_MODE there is no sign-in: every request is the one fixed local user."""
 import jwt
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -11,13 +13,15 @@ from ...domain.errors import Forbidden, Unauthorized
 from .deps import get_ctx
 
 bearer = HTTPBearer(auto_error=False)
+LOCAL_USER_ID = "00000000-0000-0000-0000-000000000001"
 
 
 class TokenVerifier:
-    def __init__(self, supabase_url, jwt_secret="", allowed_email=""):
+    def __init__(self, supabase_url, jwt_secret="", allowed_email="", local_mode=False):
         self.jwks_url = supabase_url.rstrip("/") + "/auth/v1/.well-known/jwks.json" if supabase_url else None
         self.jwt_secret = jwt_secret
         self.allowed_email = (allowed_email or "").lower()
+        self.local_mode = local_mode
         self._jwks = None
         self.known_users: set[str] = set()
 
@@ -47,13 +51,16 @@ class TokenVerifier:
 
 def current_user(request: Request, creds: HTTPAuthorizationCredentials | None = Depends(bearer),
                  ctx=Depends(get_ctx)):
-    if not creds or creds.scheme.lower() != "bearer":
-        raise Unauthorized("Missing bearer token")
     verifier: TokenVerifier = request.app.state.verifier
-    claims = verifier.decode(creds.credentials)
-    email = claims.get("email") or ""
-    verifier.check_email(email)
-    uid = claims["sub"]
+    if verifier.local_mode:
+        uid, email = LOCAL_USER_ID, verifier.allowed_email or "me@localhost"
+    else:
+        if not creds or creds.scheme.lower() != "bearer":
+            raise Unauthorized("Missing bearer token")
+        claims = verifier.decode(creds.credentials)
+        email = claims.get("email") or ""
+        verifier.check_email(email)
+        uid = claims["sub"]
     if uid not in verifier.known_users:
         profile.ensure_user(ctx, uid, email)
         verifier.known_users.add(uid)

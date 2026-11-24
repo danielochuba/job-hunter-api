@@ -8,8 +8,8 @@ from fastapi.responses import JSONResponse
 
 from ...domain import errors
 from .auth import TokenVerifier
-from .routers import (answers, applications, contacts, gmail, health, insights, jobs, misc, profile, runs, settings,
-                      tracker)
+from .routers import (answers, applications, contacts, files, gmail, health, insights, jobs, misc, profile, runs,
+                      settings, tracker)
 
 log = logging.getLogger("jobhunter.api")
 
@@ -26,7 +26,8 @@ def _startup_error(e):
     first = str(e).splitlines()[0]
     if isinstance(e, UndefinedTable):
         return False, (f"Connected, but the JobHunter tables don't exist yet: {first}\n"
-                       "  Apply the schema: npx supabase link --project-ref <ref> && npx supabase db push")
+                       "  Apply the schema: `python -m jobhunter migrate` (local Postgres), or "
+                       "npx supabase link --project-ref <ref> && npx supabase db push (hosted Supabase)")
     if "resolve host" in first or "getaddrinfo" in first or "timeout" in first.lower():
         return True, (f"Network problem reaching the database: {first}\n"
                       "  DATABASE_URL looks fine; this is DNS/connectivity. Check your internet, or try "
@@ -81,7 +82,8 @@ def create_app(container=None, start_background=True):
 
     app = FastAPI(title="JobHunter API", version="0.2.0", lifespan=lifespan)
     app.state.container = container
-    app.state.verifier = TokenVerifier(config.supabase_url, config.supabase_jwt_secret, config.allowed_user_email)
+    app.state.verifier = TokenVerifier(config.supabase_url, config.supabase_jwt_secret, config.allowed_user_email,
+                                       local_mode=config.local_mode)
     app.add_middleware(CORSMiddleware, allow_origins=list(config.web_origins), allow_credentials=True,
                        allow_methods=["*"], allow_headers=["*"])
 
@@ -104,4 +106,7 @@ def create_app(container=None, start_background=True):
 
     for r in (health, profile, settings, jobs, runs, applications, answers, contacts, gmail, tracker, insights, misc):
         app.include_router(r.router)
+    if config.local_mode:
+        app.include_router(files.router)
+        log.info("LOCAL_MODE: no sign-in, files stored in %s", config.storage_dir)
     return app

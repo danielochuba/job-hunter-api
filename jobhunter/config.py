@@ -13,6 +13,10 @@ def _bool(name, default):
 @dataclass(frozen=True)
 class Config:
     database_url: str
+    # Local mode: plain Postgres, no sign-in (one fixed local user), files on disk under storage_dir.
+    local_mode: bool = False
+    storage_dir: str = "storage"
+    public_api_url: str = "http://localhost:8000"
     supabase_url: str = ""
     supabase_service_role_key: str = ""
     supabase_jwt_secret: str = ""
@@ -56,6 +60,9 @@ class Config:
         env = os.getenv
         return cls(
             database_url=env("DATABASE_URL"),
+            local_mode=_bool("LOCAL_MODE", False),
+            storage_dir=env("STORAGE_DIR", "storage") or "storage",
+            public_api_url=(env("PUBLIC_API_URL", "http://localhost:8000") or "http://localhost:8000").rstrip("/"),
             supabase_url=env("SUPABASE_URL", ""),
             supabase_service_role_key=env("SUPABASE_SERVICE_ROLE_KEY", ""),
             supabase_jwt_secret=env("SUPABASE_JWT_SECRET", ""),

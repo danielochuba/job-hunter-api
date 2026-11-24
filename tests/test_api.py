@@ -71,6 +71,28 @@ def test_valid_token_creates_profile_and_maps_not_found(client):
     assert client.container.ctx.repos.users.get("u1")["email"] == "me@example.com"
 
 
+def test_local_mode_needs_no_token_and_serves_files(tmp_path):
+    from jobhunter.infrastructure.storage.local_storage import LocalStorage
+    from jobhunter.interfaces.api.auth import LOCAL_USER_ID
+    container = FakeContainer()
+    container.config = Config(database_url="postgresql://unused", local_mode=True, allowed_user_email="me@example.com")
+    container.ctx.storage = container.storage = LocalStorage(tmp_path, "http://api.test")
+    key = container.storage.upload("1/v1/cv — final.html", "<h1>hi</h1>", "text/html")
+    with TestClient(create_app(container, start_background=False)) as c:
+        assert c.get("/jobs/999").status_code == 404  # reached the use case: no 401
+        assert container.ctx.repos.users.get(LOCAL_USER_ID)["email"] == "me@example.com"
+        assert container.storage.signed_url(key, download_name="CV.html") == f"http://api.test/files/{key}?download=CV.html"
+        r = c.get(f"/files/{key}", params={"download": "Café CV.html"})
+        assert r.status_code == 200 and r.text == "<h1>hi</h1>" and r.headers["content-type"].startswith("text/html")
+        assert "filename*=UTF-8''Caf%C3%A9%20CV.html" in r.headers["content-disposition"]
+        assert c.get("/files/..%2F..%2Fsecret").status_code == 404
+        assert c.get("/files/missing.pdf").status_code == 404
+
+
+def test_files_route_only_exists_in_local_mode(client):
+    assert client.get("/files/anything", headers=auth(token())).status_code == 404
+
+
 def test_invalid_stage_is_422(client):
     repos = client.container.ctx.repos
     jid = repos.jobs.insert_if_new({"key": "k", "source": "s", "company": "c", "title": "t", "location": "",

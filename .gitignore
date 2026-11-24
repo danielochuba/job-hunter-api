@@ -8,3 +8,5 @@ output/
 jobs.db
 supabase/.temp/
 supabase/.branches/
+storage/
+.env.*.bak

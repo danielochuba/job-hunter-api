@@ -67,6 +67,27 @@ supabase/migrations/   SQL schema (RLS on every table, no policies)
    ```
    The API docs are at http://localhost:8000/docs.
 
+### Local mode (no Supabase, no sign-in)
+
+Runs everything on your machine: Postgres in Docker, files on disk, one fixed local user.
+
+1. Start the database (Postgres 17 + pgvector on port 5435), then apply the schema. You only need to apply it once, and again after new migrations:
+   ```bash
+   docker compose up -d
+   python -m jobhunter migrate
+   ```
+2. In `.env`:
+   ```
+   LOCAL_MODE=true
+   DATABASE_URL=postgresql://jobhunter:jobhunter@localhost:5435/jobhunter
+   STORAGE_DIR=storage                 # CVs, cover letters, avatars
+   PUBLIC_API_URL=http://localhost:8000
+   ```
+   You can leave the `SUPABASE_*` values empty.
+3. In the web app's `.env`, set `NEXT_PUBLIC_AUTH_DISABLED=true`.
+
+In local mode, the API serves stored files at `/files/...`, and every route is open to anyone who can reach the port. Keep it on localhost.
+
 ### Gmail (optional)
 1. In Google Cloud Console, create a project and enable the **Gmail API**.
 2. Set up the **OAuth consent screen**. Use the External type in Testing mode, and add yourself as a test user.

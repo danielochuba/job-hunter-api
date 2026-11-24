@@ -13,6 +13,7 @@
   python -m jobhunter sync-gmail           check sent outreach for replies
   python -m jobhunter approve ID | reject ID | applied ID
   python -m jobhunter seed-yaml PATH       import a Phase 1 master_cv.yaml or config.yaml
+  python -m jobhunter migrate              apply the schema to a local (non-Supabase) Postgres
 """
 import argparse
 import sys
@@ -111,6 +112,7 @@ COMMANDS = {
     "approve": _stage("approved"),
     "reject": _stage("rejected"),
     "applied": _stage("applied"),
+    "migrate": None,  # handled in main(): needs no app context
 }
 PATH_COMMANDS = {"import", "seed-yaml"}
 NEEDS_ID = {"show", "prep", "contacts", "approve", "reject", "applied"}
@@ -138,7 +140,15 @@ def main(argv=None):
 
     from ..config import Config
     from ..container import Container
-    container = Container(Config.from_env())
+    config = Config.from_env()
+    if a.command == "migrate":
+        from ..infrastructure.db.migrate import migrate
+        try:
+            migrate(config.database_url)
+        except Exception as e:  # noqa: BLE001
+            sys.exit(f"error: {e}")
+        return
+    container = Container(config)
     try:
         with container.session() as ctx:
             COMMANDS[a.command](ctx, a)
